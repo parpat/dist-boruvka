@@ -7,6 +7,10 @@ import (
 	"strconv"
 )
 
+type Message struct {
+	Type string
+}
+
 type Edge struct {
 	AdjNodeID int
 	Weight    int    //Edge weight
