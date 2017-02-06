@@ -42,10 +42,6 @@ const PORT string = ":7575"
 
 var enc *gob.Encoder
 
-func Edgaroo() Edges {
-	return Edges{Edge{}, Edge{}}
-}
-
 //sends message to the adjacent node of the edge
 func (e *Edge) send(m Message) {
 	conn, err := net.Dial("tcp", SUBNET+strconv.Itoa(e.AdjNodeID)+PORT)
