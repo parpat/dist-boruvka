@@ -26,13 +26,9 @@ func main() {
 		}
 
 		for {
-			conn, err := l.Accept()
-			if err != nil {
-				log.Fatal(err)
-			}
 			// Handle the connection in a new goroutine.
-			conn, err = l.Accept()
-			fmt.Printf("Got Conn")
+			conn, err := l.Accept()
+			fmt.Println("Got Conn")
 			if err != nil {
 				log.Fatal(err)
 			}
