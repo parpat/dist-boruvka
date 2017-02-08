@@ -7,15 +7,18 @@ import (
 	"strconv"
 )
 
+//Message is the template for commuication
 type Message struct {
-	Type string
+	Type     string
+	SourceID int
+	Edges    Edges
 }
 
 type Edge struct {
 	AdjNodeID int
 	Weight    int    //Edge weight
 	SE        string //Edge state
-
+	Origin    int
 }
 
 //Edge States
@@ -33,9 +36,6 @@ type Edges []Edge
 func (e Edges) Len() int           { return len(e) }
 func (e Edges) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 func (e Edges) Less(i, j int) bool { return e[i].Weight < e[j].Weight }
-
-//SUBNET of docker network
-const SUBNET string = "172.17.0."
 
 //PORT
 const PORT string = ":7575"

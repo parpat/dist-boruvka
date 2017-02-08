@@ -11,6 +11,9 @@ import (
 	"strings"
 )
 
+//SUBNET of docker network
+const SUBNET string = "172.17.0."
+
 //GetEdgesFromFile config
 func GetEdgesFromFile(fname string, id int) (Edges, int) {
 	rawContent, err := ioutil.ReadFile(fname)
@@ -35,9 +38,9 @@ func GetEdgesFromFile(fname string, id int) (Edges, int) {
 			d, _ := strconv.Atoi(vals[1])
 			w, _ := strconv.Atoi(vals[2])
 			if s == id {
-				myedges = append(myedges, Edge{SE: "Basic", Weight: w, AdjNodeID: d})
+				myedges = append(myedges, Edge{SE: "Basic", Weight: w, AdjNodeID: d, Origin: s})
 			} else if d == id {
-				myedges = append(myedges, Edge{SE: "Basic", Weight: w, AdjNodeID: s})
+				myedges = append(myedges, Edge{SE: "Basic", Weight: w, AdjNodeID: s, Origin: d})
 			}
 			//fmt.Printf("My edge %v\n", myedges)
 		}

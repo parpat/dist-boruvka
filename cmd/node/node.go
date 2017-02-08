@@ -33,7 +33,7 @@ func sendEdges() {
 		log.Printf("conn null? %v\n", conntwo == nil)
 	} else {
 		enc := gob.NewEncoder(conntwo)
-		err = enc.Encode((*ThisNode.adjacencyList)[0])
+		err = enc.Encode(distboruvka.Message{Edges: *ThisNode.adjacencyList})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -82,7 +82,7 @@ func serveConn(c net.Conn, reqs chan *distboruvka.Message) {
 	}
 
 	reqs <- &resp
-	fmt.Println("placed in request queue")
+	//fmt.Println("placed in request queue")
 }
 
 func main() {
