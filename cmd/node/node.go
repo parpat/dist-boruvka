@@ -1,23 +1,23 @@
 package main
 
 import (
-	"encoding/gob"
 	"fmt"
 	"log"
-	"net"
 	"strconv"
 	"strings"
 
-	"github.com/parpat/distboruvka"
+	distb "github.com/parpat/distboruvka"
 )
+
+const GATEWAY string = "1"
 
 //Node is the current instance
 type Node struct {
 	ID            int
-	adjacencyList *distboruvka.Edges
+	adjacencyList *distb.Edges
 }
 
-func processMessage(reqs chan *distboruvka.Message) {
+func processMessage(reqs chan distb.Message) {
 	for m := range reqs {
 		fmt.Println("request received")
 		if m.Type == "ReqAdjEdges" {
@@ -27,34 +27,24 @@ func processMessage(reqs chan *distboruvka.Message) {
 }
 
 func sendEdges() {
-	conntwo, err := net.Dial("tcp", distboruvka.SUBNET+strconv.Itoa(1)+":7575")
-	if err != nil {
-		log.Println(err)
-		log.Printf("conn null? %v\n", conntwo == nil)
-	} else {
-		enc := gob.NewEncoder(conntwo)
-		err = enc.Encode(distboruvka.Message{Edges: *ThisNode.adjacencyList})
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	log.Println("message sent to:" + distboruvka.SUBNET + strconv.Itoa(1) + ":7575")
+	msg := distb.Message{Edges: *ThisNode.adjacencyList}
+	distb.SendMessage(msg, GATEWAY)
 }
 
 var (
 	HostName string
 	HostIP   string
 	ThisNode Node
-	requests chan *distboruvka.Message
+	requests chan distb.Message
 	Logger   *log.Logger
 )
 
 func init() {
-	HostName, HostIP = distboruvka.GetHostInfo()
+	HostName, HostIP = distb.GetHostInfo()
 	octets := strings.Split(HostIP, ".")
 	fmt.Printf("My ID is: %s\n", octets[3])
 	nodeID, err := strconv.Atoi(octets[3])
-	edges, _ := distboruvka.GetEdgesFromFile("boruvka.conf", nodeID)
+	edges, _ := distb.GetEdgesFromFile("boruvka.conf", nodeID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,45 +62,11 @@ func init() {
 
 }
 
-func serveConn(c net.Conn, reqs chan *distboruvka.Message) {
-	defer c.Close()
-	var resp distboruvka.Message
-	dec := gob.NewDecoder(c)
-	err := dec.Decode(&resp)
-	if err != nil {
-		Logger.Print(err)
-	}
-
-	reqs <- &resp
-	//fmt.Println("placed in request queue")
-}
-
 func main() {
-	requests = make(chan *distboruvka.Message, 50)
+	requests = make(chan distb.Message, 5)
 	notListening := make(chan bool)
-	go func(nl chan bool) {
-		defer func() {
-			nl <- true
-		}()
-		l, err := net.Listen("tcp", ":9595")
-		//fmt.Println("Listening")
-		log.Println("Listening")
-		if err != nil {
-			log.Fatal(err)
-		}
 
-		for {
-			conn, err := l.Accept()
-			if err != nil {
-				log.Fatal(err)
-			}
-			fmt.Println("serving Conn")
-
-			// Handle the connection in a new goroutine.
-			go serveConn(conn, requests)
-		}
-	}(notListening)
-
+	go distb.ListenAndServeTCP(notListening, requests)
 	//Process incomming messages
 	go processMessage(requests)
 
