@@ -37,9 +37,6 @@ func (e Edges) Len() int           { return len(e) }
 func (e Edges) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 func (e Edges) Less(i, j int) bool { return e[i].Weight < e[j].Weight }
 
-//PORT
-const PORT string = ":7575"
-
 var enc *gob.Encoder
 
 //sends message to the adjacent node of the edge

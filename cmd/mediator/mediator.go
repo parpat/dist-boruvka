@@ -5,32 +5,46 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 
-	"github.com/parpat/distboruvka"
+	pdb "github.com/parpat/distboruvka"
 )
 
-const PORT string = "7575"
+var (
+	requests chan Message
+)
+
+type Message pdb.Message
 
 func initBoruvka() {
+	//rresp := make(chan)
+	for i := 2; i <= 5; i++ {
+		sendMessage(Message{Type: "ReqAdjEdges"}, i)
+		m := <-requests
+		fmt.Printf("%d's min Edge: -%v> %v\n ", i, m.Edges[0].Weight, m.Edges[0].AdjNodeID)
+	}
 
-	conntwo, err := net.Dial("tcp", "172.17.0.2:9595")
+}
+
+func sendMessage(m Message, node int) {
+	cliconn, err := net.Dial("tcp", pdb.SUBNET+strconv.Itoa(node)+":9595") //+pdb.PORT)
 	if err != nil {
 		log.Println(err)
 		//log.Printf("conn null? %v\n", conntwo == nil)
 	} else {
-		enc := gob.NewEncoder(conntwo)
-		err = enc.Encode(distboruvka.Message{Type: "ReqAdjEdges"})
-		log.Println("ReqAdjEdges sent")
-		if err != nil {
-			log.Fatal(err)
+		enc := gob.NewEncoder(cliconn)
+		if err = enc.Encode(m); err != nil {
+			log.Println(err)
+		} else {
+			log.Printf("%v sent\n", m.Type)
 		}
 	}
 }
 
-func serveConn(c net.Conn, reqs chan distboruvka.Message) {
-	var msg distboruvka.Message
+func serveConn(c net.Conn, reqs chan Message) {
+	var msg Message
 	dec := gob.NewDecoder(c)
-	err := dec.Decode(msg)
+	err := dec.Decode(&msg)
 	if err != nil {
 		fmt.Print(err)
 	}
@@ -42,13 +56,13 @@ func main() {
 
 	notListening := make(chan bool)
 
-	requests := make(chan distboruvka.Message)
+	requests = make(chan Message)
 
 	go func(nl chan bool) {
 		defer func() {
 			nl <- true
 		}()
-		l, err := net.Listen("tcp", ":"+PORT)
+		l, err := net.Listen("tcp", ":"+pdb.PORT)
 		fmt.Println("Listening")
 		if err != nil {
 			log.Fatal(err)

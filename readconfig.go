@@ -14,6 +14,9 @@ import (
 //SUBNET of docker network
 const SUBNET string = "172.17.0."
 
+//PORT is main comm port
+const PORT string = "7575"
+
 //GetEdgesFromFile config
 func GetEdgesFromFile(fname string, id int) (Edges, int) {
 	rawContent, err := ioutil.ReadFile(fname)
