@@ -49,6 +49,8 @@ func ServeConn(c net.Conn, reqs chan Message) {
 	//fmt.Printf("Receieved message: %v\n", msg.Type)
 }
 
+//ListenAndServeTCP listens for tcp requests and serves connections by
+//putting messages in the request queue
 func ListenAndServeTCP(listening chan bool, requests chan Message) {
 	defer func() {
 		listening <- false

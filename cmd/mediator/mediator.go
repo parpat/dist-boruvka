@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 
 	distb "github.com/parpat/distboruvka"
 )
@@ -12,11 +11,12 @@ var (
 )
 
 func initBoruvka() {
-	//rresp := make(chan)
-	for i := 2; i <= 5; i++ {
-		distb.SendMessage(distb.Message{Type: "ReqAdjEdges"}, strconv.Itoa(i))
+	nodes := distb.GetNodes()
+	for _, n := range nodes {
+
+		distb.SendMessage(distb.Message{Type: "ReqAdjEdges"}, n.ID)
 		m := <-requests
-		fmt.Printf("%d's min Edge: -%v> %v\n ", m.Edges[0].Origin, m.Edges[0].Weight, m.Edges[0].AdjNodeID)
+		fmt.Printf("%s's min Edge: -%v> %v\n ", m.Edges[0].Origin, m.Edges[0].Weight, m.Edges[0].AdjNodeID)
 	}
 
 }

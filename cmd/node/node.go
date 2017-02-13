@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 
 	distb "github.com/parpat/distboruvka"
@@ -11,13 +10,7 @@ import (
 
 const GATEWAY string = "1"
 
-//Node is the current instance
-type Node struct {
-	ID            int
-	adjacencyList *distb.Edges
-}
-
-func processMessage(reqs chan distb.Message) {
+func processMessages(reqs chan distb.Message) {
 	for m := range reqs {
 		fmt.Println("request received")
 		if m.Type == "ReqAdjEdges" {
@@ -27,36 +20,32 @@ func processMessage(reqs chan distb.Message) {
 }
 
 func sendEdges() {
-	msg := distb.Message{Edges: *ThisNode.adjacencyList}
+	msg := distb.Message{Edges: *ThisNode.AdjacencyList}
 	distb.SendMessage(msg, GATEWAY)
 }
 
 var (
-	HostName string
-	HostIP   string
-	ThisNode Node
+	ThisNode distb.Node
 	requests chan distb.Message
 	Logger   *log.Logger
 )
 
 func init() {
-	HostName, HostIP = distb.GetHostInfo()
-	octets := strings.Split(HostIP, ".")
+	hostName, hostIP := distb.GetHostInfo()
+	octets := strings.Split(hostIP, ".")
 	fmt.Printf("My ID is: %s\n", octets[3])
-	nodeID, err := strconv.Atoi(octets[3])
-	edges, _ := distb.GetEdgesFromFile("boruvka.conf", nodeID)
-	if err != nil {
-		log.Fatal(err)
-	}
+	nodeID := octets[3]
+	edges := distb.GetEdgesFromFile("boruvka.conf", nodeID)
 
-	ThisNode = Node{
+	ThisNode = distb.Node{
 		ID:            nodeID,
-		adjacencyList: &edges}
+		Name:          hostName,
+		AdjacencyList: &edges}
 
 	//logfile, err := os.Create("/logs/log" + strconv.Itoa(nodeID))
-	if err != nil {
-		log.Fatal(err)
-	}
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 	//Logger = log.New(logfile, "logger: ", log.Lshortfile)
 	_ = Logger
 
@@ -68,7 +57,9 @@ func main() {
 
 	go distb.ListenAndServeTCP(notListening, requests)
 	//Process incomming messages
-	go processMessage(requests)
+	go processMessages(requests)
+
+	go distb.SetNodeInfo(ThisNode.Name, ThisNode.ID)
 
 	<-notListening
 }

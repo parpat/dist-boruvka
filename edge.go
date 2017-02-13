@@ -4,14 +4,14 @@ import (
 	"encoding/gob"
 	"log"
 	"net"
-	"strconv"
 )
 
+//Edge is the overlay link between nodes
 type Edge struct {
-	AdjNodeID int
+	AdjNodeID string
 	Weight    int    //Edge weight
 	SE        string //Edge state
-	Origin    int
+	Origin    string
 }
 
 //Edge States
@@ -32,9 +32,9 @@ func (e Edges) Less(i, j int) bool { return e[i].Weight < e[j].Weight }
 
 var enc *gob.Encoder
 
-//sends message to the adjacent node of the edge
-func (e *Edge) send(m Message) {
-	conn, err := net.Dial("tcp", SUBNET+strconv.Itoa(e.AdjNodeID)+PORT)
+//Send message to the adjacent node of the edge
+func (e *Edge) Send(m Message) {
+	conn, err := net.Dial("tcp", SUBNET+e.AdjNodeID+PORT)
 	if err != nil {
 		log.Println(err)
 		log.Printf("conn null? %v\n", conn == nil)
@@ -45,4 +45,11 @@ func (e *Edge) send(m Message) {
 			log.Fatal(err)
 		}
 	}
+}
+
+//Node is the container
+type Node struct {
+	ID            string
+	Name          string
+	AdjacencyList *Edges
 }
