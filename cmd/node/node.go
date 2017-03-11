@@ -8,6 +8,7 @@ import (
 	distb "github.com/parpat/distboruvka"
 )
 
+//GATEWAY is the last octet of the docker subnetwork
 const GATEWAY string = "1"
 
 func processMessages(reqs chan distb.Message) {
@@ -15,6 +16,9 @@ func processMessages(reqs chan distb.Message) {
 		fmt.Println("request received")
 		if m.Type == "ReqAdjEdges" {
 			sendEdges()
+		}
+		if m.Type == "MSTBranch" {
+			markBranch(m.Edges[0])
 		}
 	}
 }
@@ -24,7 +28,14 @@ func sendEdges() {
 	distb.SendMessage(msg, GATEWAY)
 }
 
+func markBranch(e distb.Edge) {
+	idx := ThisNode.FindEdgeIdx(e.Weight)
+	(*ThisNode.AdjacencyList)[idx].SE = "Branch"
+	fmt.Printf("%v is now a Branch\n", e.Weight)
+}
+
 var (
+	//ThisNode local attributes of the node
 	ThisNode distb.Node
 	requests chan distb.Message
 	Logger   *log.Logger

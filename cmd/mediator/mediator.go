@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/parpat/boruvkamst/quickFind"
 	distb "github.com/parpat/distboruvka"
+	"github.com/parpat/distboruvka/quickFind"
 )
 
 var (
@@ -21,9 +21,10 @@ func initBoruvka() {
 	T := *new(distb.Edges)
 	//2   While T has more than one component:
 	for comps := forest.GetComponents(); len(comps) > 1; comps = forest.GetComponents() {
+		//if
 		//fmt.Printf("Components: %v\n", comps)
 		// 3 For each component C of T:
-		for _, c := range comps {
+		for c := range comps {
 			// 4 Begin with an empty set of edges S
 			S := *new(distb.Edges)
 			// 5 For each vertex v in C:
@@ -67,7 +68,12 @@ func initBoruvka() {
 
 	removeDuplicates(&T)
 	sort.Sort(T)
+
+	//Sending mst branches to their endpoints
 	for _, mste := range T {
+		mstBranchmsg := distb.Message{Type: "MSTBranch", Edges: distb.Edges{mste}}
+		distb.SendMessage(mstBranchmsg, mste.Origin)
+		distb.SendMessage(mstBranchmsg, mste.AdjNodeID)
 		fmt.Printf("MST Edge W: %d\n", mste.Weight)
 	}
 	//return T

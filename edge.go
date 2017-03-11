@@ -53,3 +53,13 @@ type Node struct {
 	Name          string
 	AdjacencyList *Edges
 }
+
+//FindEdgeIdx returns the index in the adjacency list
+func (n *Node) FindEdgeIdx(weight int) int {
+	for i, e := range *n.AdjacencyList {
+		if e.Weight == weight {
+			return i
+		}
+	}
+	return 0
+}
