@@ -34,7 +34,7 @@ var enc *gob.Encoder
 
 //Send message to the adjacent node of the edge
 func (e *Edge) Send(m Message) {
-	conn, err := net.Dial("tcp", SUBNET+e.AdjNodeID+PORT)
+	conn, err := net.Dial("tcp", SUBNET+e.AdjNodeID+":"+PORT)
 	if err != nil {
 		log.Println(err)
 		log.Printf("conn null? %v\n", conn == nil)

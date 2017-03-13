@@ -20,7 +20,7 @@ import (
 const ETCDEndpoint string = "http://172.17.0.1:2379"
 
 //GetEdgesFromFile config
-func GetEdgesFromFile(fname string, id string) Edges {
+func GetEdgesFromFile(fname string, id string) (Edges, string) {
 	rawContent, err := ioutil.ReadFile(fname)
 	if err != nil {
 		log.Fatal(err)
@@ -28,11 +28,12 @@ func GetEdgesFromFile(fname string, id string) Edges {
 
 	strs := strings.Split(string(rawContent), "\n")
 
-	wakeup, err := strconv.Atoi(strs[0])
-	if err != nil {
-		log.Print(err)
-	}
-	fmt.Printf("wakeup: %v\n", wakeup)
+	//wakeup, err := strconv.Atoi(strs[0])
+	pushSumStart := strs[0]
+	//if err != nil {
+	//	log.Print(err)
+	//}
+	fmt.Printf("pushSumStart: %s\n", pushSumStart)
 
 	strs = strs[1:]
 	var myedges Edges
@@ -53,7 +54,7 @@ func GetEdgesFromFile(fname string, id string) Edges {
 
 	sort.Sort(myedges)
 
-	return myedges
+	return myedges, pushSumStart
 }
 
 //GetHostInfo get the current node's IP and hostname

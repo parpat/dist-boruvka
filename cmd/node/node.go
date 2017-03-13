@@ -3,7 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
+	"time"
+
+	"strconv"
 
 	distb "github.com/parpat/distboruvka"
 )
@@ -20,7 +24,11 @@ func processMessages(reqs chan distb.Message) {
 		if m.Type == "MSTBranch" {
 			markBranch(m.Edges[0])
 		}
+		if m.Type == "PushSum" {
+			pushSum(m.S, m.W)
+		}
 	}
+
 }
 
 func sendEdges() {
@@ -34,11 +42,35 @@ func markBranch(e distb.Edge) {
 	fmt.Printf("%v is now a Branch\n", e.Weight)
 }
 
+func pushSum(st, wt float64) {
+	S += st
+	W += wt
+
+	//Choose random neighbor
+	rand.Seed(time.Now().UnixNano())
+	randNeighbor := (*ThisNode.AdjacencyList)[rand.Intn(len(*ThisNode.AdjacencyList))]
+
+	//Send pair (0.5S, 0.5W)
+	sh := S / 2
+	wh := W / 2
+	msgPush := distb.Message{Type: "PushSum", S: sh, W: wh}
+	randNeighbor.Send(msgPush)
+
+	S += sh
+	W += wh
+
+	fmt.Println("Current Average: ", S/W)
+
+}
+
 var (
 	//ThisNode local attributes of the node
-	ThisNode distb.Node
-	requests chan distb.Message
-	Logger   *log.Logger
+	ThisNode  distb.Node
+	requests  chan distb.Message
+	Logger    *log.Logger
+	S         float64
+	W         float64
+	startpush bool
 )
 
 func init() {
@@ -46,7 +78,7 @@ func init() {
 	octets := strings.Split(hostIP, ".")
 	fmt.Printf("My ID is: %s\n", octets[3])
 	nodeID := octets[3]
-	edges := distb.GetEdgesFromFile("boruvka.conf", nodeID)
+	edges, pushSumStart := distb.GetEdgesFromFile("boruvka.conf", nodeID)
 
 	ThisNode = distb.Node{
 		ID:            nodeID,
@@ -60,6 +92,14 @@ func init() {
 	//Logger = log.New(logfile, "logger: ", log.Lshortfile)
 	_ = Logger
 
+	//Initializing sum var
+	S, _ = strconv.ParseFloat(nodeID, 64)
+	W = 1
+
+	//Checking if current process will begin pushSum
+	if pushSumStart == nodeID {
+		startpush = true
+	}
 }
 
 func main() {
@@ -72,5 +112,9 @@ func main() {
 
 	go distb.SetNodeInfo(ThisNode.Name, ThisNode.ID)
 
+	if startpush {
+		time.Sleep(10 * time.Second)
+		pushSum(0, 0)
+	}
 	<-notListening
 }

@@ -18,6 +18,8 @@ type Message struct {
 	Type     string
 	SourceID int
 	Edges    Edges
+	S        float64
+	W        float64
 }
 
 //SendMessage sends the message to a destination in the docker network
