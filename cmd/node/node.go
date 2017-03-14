@@ -9,6 +9,8 @@ import (
 
 	"strconv"
 
+	"math"
+
 	distb "github.com/parpat/distboruvka"
 )
 
@@ -17,7 +19,7 @@ const GATEWAY string = "1"
 
 func processMessages(reqs chan distb.Message) {
 	for m := range reqs {
-		fmt.Println("request received")
+		fmt.Println("request received from: ", m.SourceID)
 		if m.Type == "ReqAdjEdges" {
 			sendEdges()
 		}
@@ -53,13 +55,23 @@ func pushSum(st, wt float64) {
 	//Send pair (0.5S, 0.5W)
 	sh := S / 2
 	wh := W / 2
-	msgPush := distb.Message{Type: "PushSum", S: sh, W: wh}
+	msgPush := distb.Message{Type: "PushSum", S: sh, W: wh, SourceID: ThisNode.ID}
+	time.Sleep(time.Millisecond * 50)
+	fmt.Println("Sent to: ", randNeighbor.AdjNodeID)
 	randNeighbor.Send(msgPush)
 
 	S += sh
 	W += wh
 
-	fmt.Println("Current Average: ", S/W)
+	avg := S / W
+	if math.IsInf(avg, 0) {
+		//fmt.Println("Inf S: ", S, " W: ", W)
+		log.Fatalln("Inf S: ", S, " W: ", W)
+	} else if math.IsNaN(avg) {
+		fmt.Println("NaN S: ", S, " W: ", W)
+	} else {
+		fmt.Println("Current Average: ", S/W)
+	}
 
 }
 

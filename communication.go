@@ -16,7 +16,7 @@ const PORT string = "7575"
 //Message is the template for commuication
 type Message struct {
 	Type     string
-	SourceID int
+	SourceID string
 	Edges    Edges
 	S        float64
 	W        float64
@@ -69,7 +69,7 @@ func ListenAndServeTCP(listening chan bool, requests chan Message) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("serving Conn")
+		//fmt.Println("serving Conn")
 
 		// Handle the connection in a new goroutine.
 		go ServeConn(conn, requests)
