@@ -20,13 +20,14 @@ const GATEWAY string = "1"
 func processMessages(reqs chan distb.Message) {
 	for m := range reqs {
 		fmt.Println("request received from: ", m.SourceID)
-		if m.Type == "ReqAdjEdges" {
+		switch m.Type {
+		case "ReqAdjEdges":
 			sendEdges()
-		}
-		if m.Type == "MSTBranch" {
+
+		case "MSTBranch":
 			markBranch(m.Edges[0])
-		}
-		if m.Type == "PushSum" {
+
+		case "PushSum":
 			pushSum(m.S, m.W)
 		}
 	}
@@ -44,6 +45,10 @@ func markBranch(e distb.Edge) {
 	fmt.Printf("%v is now a Branch\n", e.Weight)
 }
 
+//pushSum protocol is a form of network aggregation used to calculate
+//the average value between nodes in a distributed fashion. The propagation
+//of data is achieved using simple gossip protocol by selecting a uniformly random neighbor
+//to send data to.
 func pushSum(st, wt float64) {
 	S += st
 	W += wt
@@ -72,6 +77,9 @@ func pushSum(st, wt float64) {
 	} else {
 		fmt.Println("Current Average: ", S/W)
 	}
+
+	//TODO: Stop disseminating messages once converged, convergence
+	//define when value does not change more than 10^-8 for 3 consecutive values
 
 }
 

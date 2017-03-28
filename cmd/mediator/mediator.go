@@ -93,6 +93,12 @@ func removeDuplicates(dup *distb.Edges) {
 	*dup = (*dup)[:j]
 }
 
+//calcAverage initiated the push-sum protocol among the nodes
+//the results should be send back to the mediator after convergence
+func calcAverage() {
+
+}
+
 func main() {
 
 	notListening := make(chan bool)
@@ -102,6 +108,8 @@ func main() {
 	go distb.ListenAndServeTCP(notListening, requests)
 
 	go initBoruvka()
+
+	go calcAverage()
 
 	<-notListening
 
