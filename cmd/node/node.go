@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
-
-	"strconv"
 
 	"math"
 
@@ -48,10 +47,31 @@ func markBranch(e distb.Edge) {
 //pushSum protocol is a form of network aggregation used to calculate
 //the average value between nodes in a distributed fashion. The propagation
 //of data is achieved using simple gossip protocol by selecting a uniformly random neighbor
+var lastRatio = 0.0
+var ratioConvergeCount = 0
+var converged = false
+var convergenceDiff = 0.00000001
+
 //to send data to.
 func pushSum(st, wt float64) {
 	S += st
 	W += wt
+	ratio := S / W
+	//TODO: Stop disseminating messages once converged, convergence
+	//define when value does not change more than 10^-8 for 3 consecutive values
+	diff := ratio - lastRatio
+	lastRatio = ratio
+
+	if math.Abs(diff) < convergenceDiff {
+		ratioConvergeCount++
+		if ratioConvergeCount >= 3 {
+			converged = true
+			fmt.Println("CONVERGED PUSH-SUM")
+			return
+		}
+	} else {
+		ratioConvergeCount = 0
+	}
 
 	//Choose random neighbor
 	rand.Seed(time.Now().UnixNano())
@@ -68,18 +88,14 @@ func pushSum(st, wt float64) {
 	S += sh
 	W += wh
 
-	avg := S / W
-	if math.IsInf(avg, 0) {
-		//fmt.Println("Inf S: ", S, " W: ", W)
-		log.Fatalln("Inf S: ", S, " W: ", W)
-	} else if math.IsNaN(avg) {
-		fmt.Println("NaN S: ", S, " W: ", W)
-	} else {
-		fmt.Println("Current Average: ", S/W)
-	}
-
-	//TODO: Stop disseminating messages once converged, convergence
-	//define when value does not change more than 10^-8 for 3 consecutive values
+	//if math.IsInf(avg, 0) {
+	//fmt.Println("Inf S: ", S, " W: ", W)
+	//	log.Fatalln("Inf S: ", S, " W: ", W)
+	//} else if math.IsNaN(avg) {
+	//fmt.Println("NaN S: ", S, " W: ", W)
+	//} else {
+	fmt.Println("Current Average: ", S/W)
+	//}
 
 }
 
