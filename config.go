@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
+	"github.com/coreos/etcd/clientv3"
 
-	"github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 )
 
 //ETCDEndpoint to etcd clusters
@@ -74,28 +74,26 @@ func GetHostInfo() (string, string) {
 	return string(HostName), string(HostIP)
 }
 
-//API to interact with etcd
 var (
-	kapi client.KeysAPI
+	cli *clientv3.Client
 )
 
 func init() {
-	cfg := client.Config{
+	cfg := clientv3.Config{
 		Endpoints: []string{ETCDEndpoint},
-		Transport: client.DefaultTransport,
 		//Target endpoint timeout
-		HeaderTimeoutPerRequest: time.Second,
+		DialTimeout: time.Second * 5,
 	}
-	c, err := client.New(cfg)
+	var err error
+	cli, err = clientv3.New(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	kapi = client.NewKeysAPI(c)
 }
 
 //SetNodeInfo sets this node's current host(container)name and last IP octet
 func SetNodeInfo(name, id string) {
-	_, err := kapi.Set(context.Background(), "/nodes/"+name, id, nil)
+	_, err := cli.Put(context.Background(), "/nodes/"+name, id)
 	if err != nil {
 		log.Fatal(err)
 	} else {
@@ -107,21 +105,21 @@ func SetNodeInfo(name, id string) {
 func GetNodes() []Node {
 	var nodes []Node
 
-	getopt := &client.GetOptions{Recursive: true, Sort: true, Quorum: true}
-	resp, err := kapi.Get(context.Background(), "/nodes", getopt)
+	resp, err := cli.Get(context.Background(), "/nodes", clientv3.WithPrefix())
 	if err != nil {
 		log.Println("Failed to obtain node: ", err)
 	} else {
 		log.Println("Refreshed node list")
-		if (resp.Node).Nodes != nil {
-			//Nodes in type etcd/client.Response refer to etcd entries with KV
-			for _, node := range resp.Node.Nodes {
-				cName := strings.TrimPrefix(node.Key, "/nodes/")
-				nodes = append(nodes, Node{Name: cName, ID: node.Value})
-				log.Printf("Key: %q  Value: %q\n", cName, node.Value)
-			}
+		if resp.Kvs == nil {
+			log.Println("IsNil")
+		}
 
+		for _, ev := range resp.Kvs {
+			cName := bytes.TrimPrefix(ev.Key, []byte("/nodes/"))
+			nodes = append(nodes, Node{Name: string(cName[:]), ID: string(ev.Value[:])})
+			log.Printf("Key: %s  Value: %q\n", ev.Key, ev.Value)
 		}
 	}
+
 	return nodes
 }
