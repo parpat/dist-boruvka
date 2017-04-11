@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-
+	v3 "github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/contrib/recipes"
 	"golang.org/x/net/context"
 )
 
@@ -75,20 +75,23 @@ func GetHostInfo() (string, string) {
 }
 
 var (
-	cli *clientv3.Client
+	cli     *v3.Client
+	Barrier *recipe.Barrier
 )
 
 func init() {
-	cfg := clientv3.Config{
+	cfg := v3.Config{
 		Endpoints: []string{ETCDEndpoint},
 		//Target endpoint timeout
 		DialTimeout: time.Second * 5,
 	}
 	var err error
-	cli, err = clientv3.New(cfg)
+	cli, err = v3.New(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	Barrier = recipe.NewBarrier(cli, "DistBarrier")
 }
 
 //SetNodeInfo sets this node's current host(container)name and last IP octet
@@ -105,7 +108,7 @@ func SetNodeInfo(name, id string) {
 func GetNodes() []Node {
 	var nodes []Node
 
-	resp, err := cli.Get(context.Background(), "/nodes", clientv3.WithPrefix())
+	resp, err := cli.Get(context.Background(), "/nodes", v3.WithPrefix())
 	if err != nil {
 		log.Println("Failed to obtain node: ", err)
 	} else {
@@ -123,3 +126,5 @@ func GetNodes() []Node {
 
 	return nodes
 }
+
+//Wait on Barrier
