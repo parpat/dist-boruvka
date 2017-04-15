@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"sort"
 	"strconv"
+	"time"
 
 	distb "github.com/parpat/distboruvka"
 	"github.com/parpat/distboruvka/quickFind"
@@ -95,8 +98,16 @@ func removeDuplicates(dup *distb.Edges) {
 
 //calcAverage initiated the push-sum protocol among the nodes
 //the results should be send back to the mediator after convergence
-func calcAverage() {
-	distb.SendMessage(distb.Message{Type: "PushSum", S: 0, W: 0}, "7")
+func calcAverage(csvFile *os.File) {
+	defer csvFile.Close()
+	for i := 0; i < 50; i++ {
+		distb.SendMessage(distb.Message{Type: "PushSum", S: 0, W: 0}, "4")
+		m := <-requests
+		avgstr := fmt.Sprintf("%.3f", m.Avg)
+		time.Sleep(time.Millisecond * 5)
+		log.Printf("Average at: %d  is %s\n", i, avgstr)
+		csvFile.WriteString(avgstr + ",\n")
+	}
 }
 
 func main() {
@@ -108,8 +119,12 @@ func main() {
 	go distb.ListenAndServeTCP(notListening, requests)
 
 	//go initBoruvka()
+	cF, err := os.Create("data.csv")
+	if err != nil {
+		log.Fatal("Cant open csv")
+	}
 
-	go calcAverage()
+	go calcAverage(cF)
 
 	<-notListening
 }

@@ -20,6 +20,7 @@ type Message struct {
 	Edges    Edges
 	S        float64
 	W        float64
+	Avg      float64
 }
 
 //SendMessage sends the message to a destination in the docker network
@@ -47,6 +48,7 @@ func ServeConn(c net.Conn, reqs chan Message) {
 	if err != nil {
 		fmt.Print(err)
 	}
+	//log.Println(c.RemoteAddr())
 	reqs <- msg
 	//fmt.Printf("Receieved message: %v\n", msg.Type)
 }

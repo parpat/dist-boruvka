@@ -90,6 +90,7 @@ func pushSum(st, wt float64) {
 				log.Println("Barrier Released")
 			}
 			fmt.Println("CONVERGED PUSH-SUM")
+			distb.SendMessage(distb.Message{Type: "Average", Avg: ratio}, GATEWAY)
 			return
 		}
 	} else {
@@ -104,7 +105,7 @@ func pushSum(st, wt float64) {
 	sh := S / 2
 	wh := W / 2
 	msgPush := distb.Message{Type: "PushSum", S: sh, W: wh, SourceID: ThisNode.ID}
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(time.Millisecond * 5)
 	fmt.Println("Sent to: ", randNeighbor.AdjNodeID)
 	randNeighbor.Send(msgPush)
 
@@ -193,8 +194,8 @@ func main() {
 	go distb.SetNodeInfo(ThisNode.Name, ThisNode.ID)
 
 	if startpush {
-		time.Sleep(10 * time.Second)
-		pushSum(0, 0)
+		//time.Sleep(10 * time.Second)
+		//pushSum(0, 0)
 		//time.Sleep(30 * time.Second)
 		//pushSum(0, 0)
 	}
