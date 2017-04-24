@@ -2,7 +2,6 @@ package distboruvka
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os/exec"
@@ -20,7 +19,7 @@ import (
 const ETCDEndpoint string = "http://172.17.0.1:2379"
 
 //GetEdgesFromFile config
-func GetEdgesFromFile(fname string, id string) (Edges, string) {
+func GetEdgesFromFile(fname string, id string) (Edges, map[string]*Edge) {
 	rawContent, err := ioutil.ReadFile(fname)
 	if err != nil {
 		log.Fatal(err)
@@ -29,24 +28,29 @@ func GetEdgesFromFile(fname string, id string) (Edges, string) {
 	strs := strings.Split(string(rawContent), "\n")
 
 	//wakeup, err := strconv.Atoi(strs[0])
-	pushSumStart := strs[0]
+	//pushSumStart := strs[0]
 	//if err != nil {
 	//	log.Print(err)
 	//}
-	fmt.Printf("pushSumStart: %s\n", pushSumStart)
+	//fmt.Printf("pushSumStart: %s\n", pushSumStart)
 
 	strs = strs[1:]
 	var myedges Edges
-	for _, edge := range strs {
-		if edge != "" {
-			vals := strings.Split(edge, " ")
+	adjmap := make(map[string]*Edge)
+	for _, line := range strs {
+		if line != "" {
+			vals := strings.Split(line, " ")
 			s := vals[0]
 			d := vals[1]
 			w, _ := strconv.Atoi(vals[2])
 			if s == id {
-				myedges = append(myedges, Edge{SE: "Basic", Weight: w, AdjNodeID: d, Origin: s})
+				edge := Edge{SE: "Basic", Weight: w, AdjNodeID: d, Origin: s}
+				myedges = append(myedges, edge)
+				adjmap[d] = &edge
 			} else if d == id {
-				myedges = append(myedges, Edge{SE: "Basic", Weight: w, AdjNodeID: s, Origin: d})
+				edge := Edge{SE: "Basic", Weight: w, AdjNodeID: s, Origin: d}
+				myedges = append(myedges, edge)
+				adjmap[s] = &edge
 			}
 			//fmt.Printf("My edge %v\n", myedges)
 		}
@@ -54,7 +58,7 @@ func GetEdgesFromFile(fname string, id string) (Edges, string) {
 
 	sort.Sort(myedges)
 
-	return myedges, pushSumStart
+	return myedges, adjmap
 }
 
 //GetHostInfo get the current node's IP and hostname

@@ -4,14 +4,16 @@ import (
 	"encoding/gob"
 	"log"
 	"net"
+	"sync"
 )
 
 //Edge is the overlay link between nodes
 type Edge struct {
-	AdjNodeID string
-	Weight    int    //Edge weight
-	SE        string //Edge state
-	Origin    string
+	AdjNodeID    string
+	Weight       int    //Edge weight
+	SE           string //Edge state
+	Origin       string
+	MessageCount int
 }
 
 //Edge States
@@ -30,16 +32,19 @@ func (e Edges) Len() int           { return len(e) }
 func (e Edges) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 func (e Edges) Less(i, j int) bool { return e[i].Weight < e[j].Weight }
 
-var enc *gob.Encoder
+//Reusing this encoder variable creates a race condition when multiple
+//routines invoke *Edge.Send() and write assign NewEncoder writes
+//var enc *gob.Encoder
 
 //Send message to the adjacent node of the edge
-func (e *Edge) Send(m Message) {
+func (e *Edge) Send(m *Message) {
 	conn, err := net.Dial("tcp", SUBNET+e.AdjNodeID+":"+PORT)
 	if err != nil {
 		log.Println(err)
 		log.Printf("conn null? %v\n", conn == nil)
 	} else {
-		enc = gob.NewEncoder(conn)
+		m.SourceID = e.Origin
+		enc := gob.NewEncoder(conn)
 		err = enc.Encode(m)
 		if err != nil {
 			log.Fatal(err)
@@ -47,11 +52,13 @@ func (e *Edge) Send(m Message) {
 	}
 }
 
-//Node is the container
+//Node is the container's info
 type Node struct {
 	ID            string
 	Name          string
 	AdjacencyList *Edges
+	sync.RWMutex
+	AdjacencyMap map[string]*Edge //AdacencyMap holds edge for each adjacent node
 }
 
 //FindEdgeIdx returns the index in the adjacency list
