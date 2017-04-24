@@ -24,12 +24,13 @@ type Message struct {
 }
 
 //SendMessage sends the message to a destination in the docker network
-func SendMessage(m Message, node string) {
-	cliconn, err := net.Dial("tcp", SUBNET+node+":"+PORT)
+func SendMessage(m Message, srcID, destID string) {
+	cliconn, err := net.Dial("tcp", SUBNET+destID+":"+PORT)
 	if err != nil {
 		log.Println(err)
 		//log.Printf("conn null? %v\n", conntwo == nil)
 	} else {
+		m.SourceID = srcID
 		enc := gob.NewEncoder(cliconn)
 		if err = enc.Encode(m); err != nil {
 			log.Println(err)

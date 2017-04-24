@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"sort"
 	"strconv"
@@ -35,7 +36,7 @@ func initBoruvka() {
 			for _, n := range nodes {
 				id, _ := strconv.Atoi(n.ID)
 				if forest.ID[id-2] == c {
-					distb.SendMessage(distb.Message{Type: "ReqAdjEdges"}, n.ID)
+					distb.SendMessage(distb.Message{Type: "ReqAdjEdges"}, "gateway", n.ID)
 					m := <-requests
 					// 6 Find the cheapest edge from v to a vertex outside of C, and add it to S
 					for _, cedge := range m.Edges {
@@ -75,8 +76,8 @@ func initBoruvka() {
 	//Sending mst branches to their endpoints
 	for _, mste := range T {
 		mstBranchmsg := distb.Message{Type: "MSTBranch", Edges: distb.Edges{mste}}
-		distb.SendMessage(mstBranchmsg, mste.Origin)
-		distb.SendMessage(mstBranchmsg, mste.AdjNodeID)
+		distb.SendMessage(mstBranchmsg, "gateway", mste.Origin)
+		distb.SendMessage(mstBranchmsg, "gateway", mste.AdjNodeID)
 		fmt.Printf("MST Edge W: %d\n", mste.Weight)
 	}
 	//return T
@@ -100,13 +101,15 @@ func removeDuplicates(dup *distb.Edges) {
 //the results should be send back to the mediator after convergence
 func calcAverage(csvFile *os.File) {
 	defer csvFile.Close()
-	for i := 0; i < 50; i++ {
-		distb.SendMessage(distb.Message{Type: "PushSum", S: 0, W: 0}, "4")
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 30; i++ {
+		n := rand.Intn(6) + 2
+		distb.SendMessage(distb.Message{Type: "PushSum", S: 0, W: 0}, "gateway", strconv.Itoa(n))
 		m := <-requests
 		avgstr := fmt.Sprintf("%.3f", m.Avg)
-		time.Sleep(time.Millisecond * 5)
 		log.Printf("Average at: %d  is %s\n", i, avgstr)
 		csvFile.WriteString(avgstr + ",\n")
+		//time.Sleep(time.Second * 1)
 	}
 }
 
