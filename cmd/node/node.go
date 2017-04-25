@@ -96,6 +96,7 @@ func pushSum(st, wt float64) {
 		converged = false
 
 		//Keep same traffic snapshot until number of samples complete
+		psStateLock.Unlock()
 		if Ti == 0 {
 			Ti = getCurrMaxTraffic()
 		} else if pushSumCounter >= PushSumIterations {
@@ -103,6 +104,7 @@ func pushSum(st, wt float64) {
 			pushSumCounter = 0
 			log.Println("Push Sum counter reset")
 		}
+		psStateLock.Unlock()
 
 		S = Ti
 		W = 1
@@ -165,7 +167,9 @@ func watchBarrier() {
 	psStateLock.Unlock()
 	log.Println("Ending PushSum, Converged: ", S/W)
 	log.Println("Traffic at convergence: ", Ti)
+	psStateLock.Lock()
 	pushSumCounter++
+	psStateLock.Unlock()
 
 }
 
