@@ -3,13 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"math"
+	stats "github.com/montanaflynn/stats"
 
 	distb "github.com/parpat/distboruvka"
 )
@@ -17,6 +18,8 @@ import (
 //GATEWAY is the last octet of the docker subnetwork
 const GATEWAY string = "1"
 const PushSumIterations = 30
+
+var psData [PushSumIterations]float64
 
 func processMessages(reqs chan distb.Message) {
 	for m := range reqs {
@@ -59,7 +62,11 @@ func markBranch(e distb.Edge) {
 func dumTraffic() {
 	//Choose random neighbor
 	rand.Seed(time.Now().UnixNano())
-	randAdjEdge := (*ThisNode.AdjacencyList)[rand.Intn(len(*ThisNode.AdjacencyList))]
+	randAdjEdge := (*ThisNode.AdjacencyList)[0]
+	if len(*ThisNode.AdjacencyList) > 1 {
+		randAdjEdge = (*ThisNode.AdjacencyList)[rand.Intn(len(*ThisNode.AdjacencyList))]
+	}
+
 	//fmt.Println("Dum message to: ", randAdjEdge.AdjNodeID)
 	time.Sleep(time.Millisecond * 200)
 	randAdjEdge.Send(&distb.Message{Type: "DumTraffic"})
@@ -96,21 +103,20 @@ func pushSum(st, wt float64) {
 		converged = false
 
 		//Keep same traffic snapshot until number of samples complete
-		psStateLock.Unlock()
+		psStateLock.Lock()
 		if Ti == 0 {
-			Ti = getCurrMaxTraffic()
+			Ti, BEi = getCurrMaxTraffic()
 		} else if pushSumCounter >= PushSumIterations {
-			Ti = getCurrMaxTraffic()
+			Ti, BEi = getCurrMaxTraffic()
 			pushSumCounter = 0
 			log.Println("Push Sum counter reset")
 		}
-		psStateLock.Unlock()
+		PushSumActive = true
 
 		S = Ti
 		W = 1
-		psStateLock.Lock()
-		PushSumActive = true
 		psStateLock.Unlock()
+
 	}
 	S += st
 	W += wt
@@ -163,27 +169,58 @@ func watchBarrier() {
 		log.Fatalf("could not wait on barrier (%v)", err)
 	}
 	psStateLock.Lock()
+	defer psStateLock.Unlock()
 	PushSumActive = false
-	psStateLock.Unlock()
+	pushSumCounter++
+	psData[pushSumCounter-1] = S / W
+
+	if pushSumCounter == PushSumIterations {
+		calcStats()
+	}
+
 	log.Println("Ending PushSum, Converged: ", S/W)
 	log.Println("Traffic at convergence: ", Ti)
-	psStateLock.Lock()
-	pushSumCounter++
-	psStateLock.Unlock()
 
 }
 
-func getCurrMaxTraffic() float64 {
+func calcStats() {
+	//psStateLock.RLock()
+	//defer psStateLock.RUnlock()
+
+	statsData := stats.Float64Data(psData[:])
+	stdDev, err := statsData.StandardDeviation()
+	fmt.Printf("Std_Dev: %.3f\n", stdDev)
+	if err != nil {
+		log.Println("Couldnt calc StandardDeviation")
+	}
+	mean, _ := statsData.Mean()
+	fmt.Printf("Mean: %.3f\n", mean)
+
+	threshold := (2.0 * stdDev) + mean
+	lowThreshold := (2.0 * (0.8 * stdDev)) + mean
+
+	if Ti >= threshold {
+		fmt.Printf("Potential Bottleneck! Node Traffic: %v Edge: %v\n", Ti, BEi)
+
+	} else if Ti >= (0.95 * lowThreshold) {
+		fmt.Printf("Unlikely Bottleneck! Node Traffic: %v Edge: %v\n", Ti, BEi)
+	}
+
+}
+
+func getCurrMaxTraffic() (float64, int) {
 	var max = 0
+	var edgeWeight = 0
 	ThisNode.RLock()
 	defer ThisNode.RUnlock()
 	for _, e := range ThisNode.AdjacencyMap {
 		if max < e.MessageCount {
 			max = e.MessageCount
+			edgeWeight = e.Weight
 		}
 	}
 	log.Println("Max Traffic: ", max)
-	return float64(max)
+	return float64(max), edgeWeight
 }
 
 var (
@@ -194,6 +231,7 @@ var (
 	S             float64
 	W             float64
 	Ti            float64
+	BEi           int
 	startpush     bool
 	PushSumActive bool
 	psStateLock   = &sync.RWMutex{}
