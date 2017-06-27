@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/awalterschulze/gographviz"
 	v3 "github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/contrib/recipes"
 	"golang.org/x/net/context"
@@ -35,7 +36,7 @@ func GetEdgesFromFile(fname string, id string) (Edges, map[string]*Edge) {
 	//fmt.Printf("pushSumStart: %s\n", pushSumStart)
 
 	strs = strs[1:]
-	var myedges Edges
+	var edges Edges
 	adjmap := make(map[string]*Edge)
 	for _, line := range strs {
 		if line != "" {
@@ -45,20 +46,20 @@ func GetEdgesFromFile(fname string, id string) (Edges, map[string]*Edge) {
 			w, _ := strconv.Atoi(vals[2])
 			if s == id {
 				edge := Edge{SE: "Basic", Weight: w, AdjNodeID: d, Origin: s}
-				myedges = append(myedges, edge)
+				edges = append(edges, edge)
 				adjmap[d] = &edge
 			} else if d == id {
 				edge := Edge{SE: "Basic", Weight: w, AdjNodeID: s, Origin: d}
-				myedges = append(myedges, edge)
+				edges = append(edges, edge)
 				adjmap[s] = &edge
 			}
-			//fmt.Printf("My edge %v\n", myedges)
+			//fmt.Printf("My edge %v\n", edges)
 		}
 	}
 
-	sort.Sort(myedges)
+	sort.Sort(edges)
 
-	return myedges, adjmap
+	return edges, adjmap
 }
 
 //GetHostInfo get the current node's IP and hostname
@@ -131,4 +132,39 @@ func GetNodes() []Node {
 	return nodes
 }
 
-//Wait on Barrier
+func GetGraphDOTFile(fname string, id string) (Edges, map[string]*Edge) {
+	graphstr, err := ioutil.ReadFile(fname)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Print(string(graphstr))
+	log.Print(string([]byte(`digraph G {Hello->World}`)))
+
+	g, err := gographviz.Read(graphstr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var edges Edges
+	adjmap := make(map[string]*Edge)
+	for _, e := range g.Edges.Edges {
+		eID, err := strconv.Atoi(e.Attrs["label"])
+		if err != nil {
+			panic(err)
+		}
+		if e.Src == id {
+			edge := Edge{SE: "Basic", Weight: eID, AdjNodeID: e.Dst, Origin: e.Src}
+			edges = append(edges, edge)
+			adjmap[e.Dst] = &edge
+		} else if e.Dst == id {
+			edge := Edge{SE: "Basic", Weight: eID, AdjNodeID: e.Src, Origin: e.Dst}
+			edges = append(edges, edge)
+			adjmap[e.Src] = &edge
+		}
+
+	}
+
+	sort.Sort(edges)
+	return edges, adjmap
+
+}
