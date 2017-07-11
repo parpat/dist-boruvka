@@ -31,19 +31,25 @@ func processMessages(reqs chan distb.Message) {
 
 		switch m.Type {
 		case "ReqAdjEdges":
-			sendEdges()
+			go sendEdges()
 
 		case "MSTBranch":
-			markBranch(m.Edges[0])
+			go markBranch(m.Edges[0])
 
 		case "PushSum":
 			pushSum(m.S, m.W)
 
 		case "DumTraffic":
-			dumTraffic(m.SourceID)
+			go dumTraffic(m.SourceID)
 
 		case "TrafficData":
-			sendTrafficData()
+			go sendTrafficData()
+
+		case "IsHighTraffic":
+			go distb.SendMessage(distb.Message{SourceID: ThisNode.ID, HighTraffic: IsHighTraffic, Type: "IsHighTrafficReply"}, ThisNode.ID, m.SourceID)
+
+		case "IsHighTrafficReply":
+			adjTrafficChan <- m.HighTraffic
 
 		}
 	}
@@ -93,7 +99,7 @@ func dumTraffic(inID string) {
 
 func sendTrafficData() {
 	ThisNode.RLock()
-	msg := distb.Message{BufferA: TnumMsg, HighTraffic: IsHighTraffic}
+	msg := distb.Message{BufferA: TnumMsg, HighTraffic: IsHighTraffic, Edges: HighRiskEdges}
 	ThisNode.RUnlock()
 	distb.SendMessage(msg, ThisNode.ID, GATEWAY)
 }
@@ -209,6 +215,7 @@ func watchBarrier() {
 
 	if pushSumCounter >= PushSumIterations {
 		calcStats()
+		findHighRiskEdges()
 	} else {
 		log.Println("Did not calc stats; counter: ", pushSumCounter)
 	}
@@ -265,20 +272,35 @@ func getCurrMaxTraffic() (float64, int) {
 	return float64(max), edgeWeight
 }
 
+func findHighRiskEdges() {
+	if IsHighTraffic {
+		for _, e := range *ThisNode.AdjacencyList {
+			e.Send(&distb.Message{SourceID: ThisNode.ID, Type: "IsHighTraffic"})
+			isAdjNodeHT := <-adjTrafficChan
+			if isAdjNodeHT {
+				HighRiskEdges = append(HighRiskEdges, e)
+			}
+
+		}
+	}
+}
+
 var (
 	//ThisNode local attributes of the node
-	ThisNode      *distb.Node
-	requests      chan distb.Message
-	Logger        *log.Logger
-	S             float64
-	W             float64
-	Ti            float64
-	BEi           int
-	TnumMsg       int
-	startpush     bool
-	PushSumActive bool
-	psStateLock   = &sync.RWMutex{}
-	IsHighTraffic bool
+	ThisNode       *distb.Node
+	requests       chan distb.Message
+	Logger         *log.Logger
+	S              float64
+	W              float64
+	Ti             float64
+	BEi            int
+	TnumMsg        int
+	HighRiskEdges  distb.Edges
+	startpush      bool
+	PushSumActive  bool
+	psStateLock    = &sync.RWMutex{}
+	IsHighTraffic  bool
+	adjTrafficChan chan bool
 )
 
 func init() {
@@ -311,6 +333,10 @@ func init() {
 	//if pushSumStart == nodeID {
 	//	startpush = true
 	//}
+
+	//channel for findHighRiskEdges that concurrently queries adj nodes
+	//and waits for reply
+	adjTrafficChan = make(chan bool)
 }
 
 func main() {
@@ -323,7 +349,7 @@ func main() {
 
 	go distb.SetNodeInfo(ThisNode.Name, ThisNode.ID)
 
-	time.Sleep(time.Second * 240)
+	time.Sleep(time.Second * 180)
 	//go dummyInjector() // Consistently generate messages
 	dumTraffic("999") // For starting with one message
 	<-notListening
