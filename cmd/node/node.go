@@ -40,7 +40,11 @@ func processMessages(reqs chan distb.Message) {
 			pushSum(m.S, m.W)
 
 		case "DumTraffic":
-			go dumTraffic()
+			dumTraffic(m.SourceID)
+
+		case "TrafficData":
+			sendTrafficData()
+
 		}
 	}
 
@@ -59,18 +63,46 @@ func markBranch(e distb.Edge) {
 }
 
 //Keep pushing dummy traffic to random nodes
-func dumTraffic() {
+func dumTraffic(inID string) {
 	//Choose random neighbor
 	rand.Seed(time.Now().UnixNano())
+	//ThisNode.RLock()
+	//defer ThisNode.RUnlock()
 	randAdjEdge := (*ThisNode.AdjacencyList)[0]
 	if len(*ThisNode.AdjacencyList) > 1 {
 		randAdjEdge = (*ThisNode.AdjacencyList)[rand.Intn(len(*ThisNode.AdjacencyList))]
 	}
 
-	//fmt.Println("Dum message to: ", randAdjEdge.AdjNodeID)
-	time.Sleep(time.Millisecond * 200)
+	/*	if len(*ThisNode.AdjacencyList) > 1 {
+			for {
+				randAdjEdge = (*ThisNode.AdjacencyList)[rand.Intn(len(*ThisNode.AdjacencyList))]
+				if randAdjEdge.AdjNodeID != inID {
+					break
+				}
+			}
+		} else { // drop message
+			return
+		}*/
+
+	fmt.Println("Dum message sent to: ", randAdjEdge.AdjNodeID)
+	time.Sleep(time.Millisecond * 20)
 	randAdjEdge.Send(&distb.Message{Type: "DumTraffic"})
 	updateMessageCounter(randAdjEdge.AdjNodeID)
+
+}
+
+func sendTrafficData() {
+	ThisNode.RLock()
+	msg := distb.Message{BufferA: TnumMsg, HighTraffic: IsHighTraffic}
+	ThisNode.RUnlock()
+	distb.SendMessage(msg, ThisNode.ID, GATEWAY)
+}
+
+func dummyInjector() {
+	for {
+		time.Sleep(time.Millisecond * 5000)
+		dumTraffic("999")
+	}
 
 }
 
@@ -87,7 +119,7 @@ func updateMessageCounter(adjnode string) {
 var lastRatio = 0.0
 var ratioConvergeCount = 0
 var converged = false
-var convergenceDiff = 0.00000001
+var convergenceDiff = 0.000000001
 var pushSumCounter = 0 //keeps track of the number of samples
 
 func pushSum(st, wt float64) {
@@ -113,7 +145,8 @@ func pushSum(st, wt float64) {
 		}
 		PushSumActive = true
 
-		S = Ti
+		//S = Ti max traffic edge Edge
+		S = float64(TnumMsg) //total traffic on node
 		W = 1
 		psStateLock.Unlock()
 
@@ -151,8 +184,8 @@ func pushSum(st, wt float64) {
 	sh := S / 2
 	wh := W / 2
 	msgPush := &distb.Message{Type: "PushSum", S: sh, W: wh, SourceID: ThisNode.ID}
-	time.Sleep(time.Millisecond * 5)
-	fmt.Println("Sent to: ", randAdjEdge.AdjNodeID)
+	//time.Sleep(time.Millisecond * 1)
+	fmt.Println("PUSH-SUM Send to: ", randAdjEdge.AdjNodeID)
 	randAdjEdge.Send(msgPush)
 	updateMessageCounter(randAdjEdge.AdjNodeID)
 
@@ -164,7 +197,7 @@ func pushSum(st, wt float64) {
 }
 
 func watchBarrier() {
-	log.Println("WAiting on Barrier")
+	log.Println("Waiting on Barrier")
 	if err := distb.Barrier.Wait(); err != nil {
 		log.Fatalf("could not wait on barrier (%v)", err)
 	}
@@ -174,12 +207,15 @@ func watchBarrier() {
 	pushSumCounter++
 	psData[pushSumCounter-1] = S / W
 
-	if pushSumCounter == PushSumIterations {
+	if pushSumCounter >= PushSumIterations {
 		calcStats()
+	} else {
+		log.Println("Did not calc stats; counter: ", pushSumCounter)
 	}
 
 	log.Println("Ending PushSum, Converged: ", S/W)
 	log.Println("Traffic at convergence: ", Ti)
+	log.Println("Total Num messages: ", TnumMsg)
 
 }
 
@@ -197,13 +233,15 @@ func calcStats() {
 	fmt.Printf("Mean: %.3f\n", mean)
 
 	threshold := (2.0 * stdDev) + mean
-	lowThreshold := (2.0 * (0.8 * stdDev)) + mean
+	lowThreshold := (1.1 * stdDev) + mean
 
-	if Ti >= threshold {
-		fmt.Printf("Potential Bottleneck! Node Traffic: %v Edge: %v\n", Ti, BEi)
+	if float64(TnumMsg) >= threshold {
+		fmt.Printf("High traffic! Node: %v Edge: %v\n", Ti, BEi)
+		IsHighTraffic = true
 
-	} else if Ti >= (0.95 * lowThreshold) {
-		fmt.Printf("Unlikely Bottleneck! Node Traffic: %v Edge: %v\n", Ti, BEi)
+	} else if float64(TnumMsg) >= (lowThreshold) {
+		fmt.Printf("Unlikely Bottleneck! Node: %v Edge: %v\n", Ti, BEi)
+		//IsHighTraffic = true
 	}
 
 }
@@ -211,15 +249,19 @@ func calcStats() {
 func getCurrMaxTraffic() (float64, int) {
 	var max = 0
 	var edgeWeight = 0
-	ThisNode.RLock()
-	defer ThisNode.RUnlock()
+	ThisNode.Lock()
+	defer ThisNode.Unlock()
+	TnumMsg = 0
 	for _, e := range ThisNode.AdjacencyMap {
+		TnumMsg += e.MessageCount
+		log.Printf("Traffic at link TO %s IS %d\n", e.AdjNodeID, e.MessageCount)
 		if max < e.MessageCount {
 			max = e.MessageCount
 			edgeWeight = e.Weight
 		}
 	}
 	log.Println("Max Traffic: ", max)
+	log.Println("Node Total: ", TnumMsg)
 	return float64(max), edgeWeight
 }
 
@@ -232,23 +274,27 @@ var (
 	W             float64
 	Ti            float64
 	BEi           int
+	TnumMsg       int
 	startpush     bool
 	PushSumActive bool
 	psStateLock   = &sync.RWMutex{}
+	IsHighTraffic bool
 )
 
 func init() {
 	hostName, hostIP := distb.GetHostInfo()
 	octets := strings.Split(hostIP, ".")
-	fmt.Printf("My ID is: %s\n", octets[3])
+	log.Printf("My ID is: %s\n", octets[3])
 	nodeID := octets[3]
-	edges, adjMap := distb.GetEdgesFromFile("boruvka.conf", nodeID)
+	edges, adjMap := distb.GetGraphDOTFile("sample.dot", nodeID)
 
 	ThisNode = &distb.Node{
 		ID:            nodeID,
 		Name:          hostName,
 		AdjacencyList: &edges,
 		AdjacencyMap:  adjMap}
+
+	log.Printf("ADJLIST: %v\n", *ThisNode.AdjacencyList)
 
 	//logfile, err := os.Create("/logs/log" + strconv.Itoa(nodeID))
 	// if err != nil {
@@ -277,8 +323,8 @@ func main() {
 
 	go distb.SetNodeInfo(ThisNode.Name, ThisNode.ID)
 
-	time.Sleep(time.Second * 7)
-	dumTraffic()
-
+	time.Sleep(time.Second * 240)
+	//go dummyInjector() // Consistently generate messages
+	dumTraffic("999") // For starting with one message
 	<-notListening
 }

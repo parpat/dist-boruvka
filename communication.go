@@ -15,12 +15,14 @@ const PORT string = "7575"
 
 //Message is the template for commuication
 type Message struct {
-	Type     string
-	SourceID string
-	Edges    Edges
-	S        float64
-	W        float64
-	Avg      float64
+	Type        string
+	SourceID    string
+	Edges       Edges
+	S           float64
+	W           float64
+	Avg         float64
+	BufferA     int
+	HighTraffic bool
 }
 
 //SendMessage sends the message to a destination in the docker network
@@ -35,7 +37,7 @@ func SendMessage(m Message, srcID, destID string) {
 		if err = enc.Encode(m); err != nil {
 			log.Println(err)
 		} else {
-			log.Printf("%v sent\n", m.Type)
+			log.Printf("%v Sent\n", m.Type)
 		}
 	}
 }
@@ -51,7 +53,7 @@ func ServeConn(c net.Conn, reqs chan Message) {
 	}
 	//log.Println(c.RemoteAddr())
 	reqs <- msg
-	//fmt.Printf("Receieved message: %v\n", msg.Type)
+	fmt.Printf("Receieved message: %v\n", msg.Type)
 }
 
 //ListenAndServeTCP listens for tcp requests and serves connections by

@@ -139,7 +139,6 @@ func GetGraphDOTFile(fname string, id string) (Edges, map[string]*Edge) {
 	}
 
 	log.Print(string(graphstr))
-	log.Print(string([]byte(`digraph G {Hello->World}`)))
 
 	g, err := gographviz.Read(graphstr)
 	if err != nil {
@@ -150,16 +149,33 @@ func GetGraphDOTFile(fname string, id string) (Edges, map[string]*Edge) {
 	for _, e := range g.Edges.Edges {
 		eID, err := strconv.Atoi(e.Attrs["label"])
 		if err != nil {
-			panic(err)
+			log.Print(err)
+			eID = 0
 		}
-		if e.Src == id {
-			edge := Edge{SE: "Basic", Weight: eID, AdjNodeID: e.Dst, Origin: e.Src}
+
+		eSrci, err := strconv.Atoi(e.Src)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		eSrci += 2
+		eSrc := strconv.Itoa(eSrci)
+
+		eDsti, err := strconv.Atoi(e.Dst)
+		if err != nil {
+			log.Fatal(err)
+		}
+		eDsti += 2
+		eDst := strconv.Itoa(eDsti)
+
+		if eSrc == id {
+			edge := Edge{SE: "Basic", Weight: eID, AdjNodeID: eDst, Origin: eSrc}
 			edges = append(edges, edge)
-			adjmap[e.Dst] = &edge
-		} else if e.Dst == id {
-			edge := Edge{SE: "Basic", Weight: eID, AdjNodeID: e.Src, Origin: e.Dst}
+			adjmap[eDst] = &edge
+		} else if eDst == id {
+			edge := Edge{SE: "Basic", Weight: eID, AdjNodeID: eSrc, Origin: eDst}
 			edges = append(edges, edge)
-			adjmap[e.Src] = &edge
+			adjmap[eSrc] = &edge
 		}
 
 	}
