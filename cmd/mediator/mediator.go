@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log"
 	"math/rand"
@@ -103,13 +104,47 @@ func calcAverage(csvFile *os.File) {
 	defer csvFile.Close()
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < 30; i++ {
-		n := rand.Intn(6) + 2
+		//Intn[,n)
+		n := rand.Intn(90) + 2
+		log.Println("Seed PS at: ", n)
 		distb.SendMessage(distb.Message{Type: "PushSum", S: 0, W: 0}, "gateway", strconv.Itoa(n))
 		m := <-requests
 		avgstr := fmt.Sprintf("%.3f", m.Avg)
 		log.Printf("Average at: %d  is %s\n", i, avgstr)
 		csvFile.WriteString(avgstr + ",\n")
-		//time.Sleep(time.Second * 1)
+		time.Sleep(time.Millisecond * 90)
+	}
+}
+
+func getTrafficInfo(numNodes int, tcsvFile *os.File) {
+	csvw := csv.NewWriter(tcsvFile)
+	for i := 2; i <= (2 + numNodes - 1); i++ {
+		distb.SendMessage(distb.Message{Type: "TrafficData"}, "gateway", strconv.Itoa(i))
+		m := <-requests
+		fmt.Printf("----Node %d Total Visits: %d\n High Traffic? %v\n PS-Msgs: %d\n Edges: %v\n", i, m.BufferA, m.HighTraffic, m.BufferB, m.Edges)
+
+		if err := csvw.Write([]string{strconv.Itoa(m.BufferA), strconv.FormatBool(m.HighTraffic), strconv.Itoa(m.BufferB)}); err != nil {
+			log.Fatalln("error writing record to csv:", err)
+		}
+
+		/*timeout := make(chan bool, 1)
+		go func() {
+			time.Sleep(5 * time.Second)
+			timeout <- true
+		}()
+		select {
+		case m := <-requests:
+			fmt.Printf("%d: %d High Traffic? %v\n", i, m.BufferA, m.HighTraffic)
+		case <-timeout:
+			log.Print("Request Timeout ", i)
+		}
+		*/
+	}
+
+	// Write any buffered data to the underlying writer (csvfile).
+	csvw.Flush()
+	if err := csvw.Error(); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -122,12 +157,23 @@ func main() {
 	go distb.ListenAndServeTCP(notListening, requests)
 
 	//go initBoruvka()
+
 	cF, err := os.Create("data.csv")
 	if err != nil {
 		log.Fatal("Cant open csv")
 	}
+	calcAverage(cF)
 
-	go calcAverage(cF)
+	nNodes, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	<-notListening
+	tF, err := os.Create("trafficdata.csv")
+	if err != nil {
+		log.Fatal("Cant open csv")
+	}
+	getTrafficInfo(nNodes, tF)
+
+	//<-notListening
 }
