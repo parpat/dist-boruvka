@@ -37,6 +37,7 @@ func processMessages(reqs chan distb.Message) {
 			go markBranch(m.Edges[0])
 
 		case "PushSum":
+			TnumPushMsg++
 			pushSum(m.S, m.W)
 
 		case "DumTraffic":
@@ -46,7 +47,8 @@ func processMessages(reqs chan distb.Message) {
 			go sendTrafficData()
 
 		case "IsHighTraffic":
-			go distb.SendMessage(distb.Message{SourceID: ThisNode.ID, HighTraffic: IsHighTraffic, Type: "IsHighTrafficReply"}, ThisNode.ID, m.SourceID)
+			log.Println("sending HIGH TRAFFIC REPLY")
+			distb.SendMessage(distb.Message{SourceID: ThisNode.ID, HighTraffic: IsHighTraffic, Type: "IsHighTrafficReply"}, ThisNode.ID, m.SourceID)
 
 		case "IsHighTrafficReply":
 			adjTrafficChan <- m.HighTraffic
@@ -90,7 +92,7 @@ func dumTraffic(inID string) {
 			return
 		}*/
 
-	fmt.Println("Dum message sent to: ", randAdjEdge.AdjNodeID)
+	//fmt.Println("Dum message sent to: ", randAdjEdge.AdjNodeID)
 	time.Sleep(time.Millisecond * 20)
 	randAdjEdge.Send(&distb.Message{Type: "DumTraffic"})
 	updateMessageCounter(randAdjEdge.AdjNodeID)
@@ -99,7 +101,7 @@ func dumTraffic(inID string) {
 
 func sendTrafficData() {
 	ThisNode.RLock()
-	msg := distb.Message{BufferA: TnumMsg, HighTraffic: IsHighTraffic, Edges: HighRiskEdges}
+	msg := distb.Message{BufferA: TnumMsg, BufferB: TnumPushMsg, HighTraffic: IsHighTraffic, Edges: HighRiskEdges}
 	ThisNode.RUnlock()
 	distb.SendMessage(msg, ThisNode.ID, GATEWAY)
 }
@@ -218,6 +220,7 @@ func watchBarrier() {
 		findHighRiskEdges()
 	} else {
 		log.Println("Did not calc stats; counter: ", pushSumCounter)
+		highTrafficCheck = true
 	}
 
 	log.Println("Ending PushSum, Converged: ", S/W)
@@ -242,14 +245,19 @@ func calcStats() {
 	threshold := (2.0 * stdDev) + mean
 	lowThreshold := (1.1 * stdDev) + mean
 
+	ThisNode.Lock()
+	defer ThisNode.Unlock()
+
 	if float64(TnumMsg) >= threshold {
 		fmt.Printf("High traffic! Node: %v Edge: %v\n", Ti, BEi)
 		IsHighTraffic = true
 
 	} else if float64(TnumMsg) >= (lowThreshold) {
 		fmt.Printf("Unlikely Bottleneck! Node: %v Edge: %v\n", Ti, BEi)
-		//IsHighTraffic = true
+		IsHighTraffic = true
 	}
+
+	highTrafficCheck = true
 
 }
 
@@ -273,10 +281,15 @@ func getCurrMaxTraffic() (float64, int) {
 }
 
 func findHighRiskEdges() {
-	if IsHighTraffic {
+	ThisNode.RLock()
+	isThisHT := IsHighTraffic
+	ThisNode.RUnlock()
+	if isThisHT {
 		for _, e := range *ThisNode.AdjacencyList {
 			e.Send(&distb.Message{SourceID: ThisNode.ID, Type: "IsHighTraffic"})
+			log.Println("--> HIGH TRAFFIC CHECK --->", e.AdjNodeID)
 			isAdjNodeHT := <-adjTrafficChan
+			log.Println("<-- HIGH TRAFFIC CHECK REPLY<---", isAdjNodeHT)
 			if isAdjNodeHT {
 				HighRiskEdges = append(HighRiskEdges, e)
 			}
@@ -287,20 +300,22 @@ func findHighRiskEdges() {
 
 var (
 	//ThisNode local attributes of the node
-	ThisNode       *distb.Node
-	requests       chan distb.Message
-	Logger         *log.Logger
-	S              float64
-	W              float64
-	Ti             float64
-	BEi            int
-	TnumMsg        int
-	HighRiskEdges  distb.Edges
-	startpush      bool
-	PushSumActive  bool
-	psStateLock    = &sync.RWMutex{}
-	IsHighTraffic  bool
-	adjTrafficChan chan bool
+	ThisNode         *distb.Node
+	requests         chan distb.Message
+	Logger           *log.Logger
+	S                float64
+	W                float64
+	Ti               float64
+	BEi              int
+	TnumMsg          int
+	HighRiskEdges    distb.Edges
+	startpush        bool
+	PushSumActive    bool
+	psStateLock      = &sync.RWMutex{}
+	IsHighTraffic    bool
+	highTrafficCheck bool
+	adjTrafficChan   chan bool
+	TnumPushMsg      int
 )
 
 func init() {
@@ -308,7 +323,7 @@ func init() {
 	octets := strings.Split(hostIP, ".")
 	log.Printf("My ID is: %s\n", octets[3])
 	nodeID := octets[3]
-	edges, adjMap := distb.GetGraphDOTFile("sample.dot", nodeID)
+	edges, adjMap := distb.GetGraphDOTFile("/home/parth/workspace/networkgen/graph.dot", nodeID)
 
 	ThisNode = &distb.Node{
 		ID:            nodeID,
@@ -340,7 +355,7 @@ func init() {
 }
 
 func main() {
-	requests = make(chan distb.Message, 5)
+	requests = make(chan distb.Message, 25)
 	notListening := make(chan bool)
 
 	go distb.ListenAndServeTCP(notListening, requests)
@@ -349,7 +364,7 @@ func main() {
 
 	go distb.SetNodeInfo(ThisNode.Name, ThisNode.ID)
 
-	time.Sleep(time.Second * 180)
+	time.Sleep(time.Second * 100)
 	//go dummyInjector() // Consistently generate messages
 	dumTraffic("999") // For starting with one message
 	<-notListening

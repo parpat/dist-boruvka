@@ -21,7 +21,8 @@ type Message struct {
 	S           float64
 	W           float64
 	Avg         float64
-	BufferA     int
+	BufferA     int // Total Num of Messages
+	BufferB     int //Push-Sum Messages
 	HighTraffic bool
 }
 
@@ -37,7 +38,7 @@ func SendMessage(m Message, srcID, destID string) {
 		if err = enc.Encode(m); err != nil {
 			log.Println(err)
 		} else {
-			log.Printf("%v Sent\n", m.Type)
+			//log.Printf("%v Sent\n", m.Type)
 		}
 	}
 }
@@ -53,7 +54,7 @@ func ServeConn(c net.Conn, reqs chan Message) {
 	}
 	//log.Println(c.RemoteAddr())
 	reqs <- msg
-	fmt.Printf("Receieved message: %v\n", msg.Type)
+	//fmt.Printf("Receieved message: %v\n", msg.Type)
 }
 
 //ListenAndServeTCP listens for tcp requests and serves connections by
